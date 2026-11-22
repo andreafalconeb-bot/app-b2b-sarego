@@ -1,0 +1,18 @@
+# App B2B SAREGO como Worker de Cloudflare con assets estáticos (la PWA de
+# web/dist), igual que la app retail (crm.distribuidorasarego.com) y la
+# academia (academia.distribuidorasarego.com). El build de Vite corre
+# antes del deploy (ver .github/workflows/deploy.yml).
+name = "app-b2b-sarego"
+compatibility_date = "2026-01-01"
+workers_dev = true
+
+[assets]
+directory = "./web/dist"
+# Rutas de cliente (/proyecto/:id, /qr/:token…) las resuelve la app
+not_found_handling = "single-page-application"
+
+# Crea solo el DNS y el certificado del subdominio en la zona
+# distribuidorasarego.com (misma cuenta de Cloudflare que la app retail).
+[[routes]]
+pattern = "b2b.distribuidorasarego.com"
+custom_domain = true

@@ -136,22 +136,45 @@ export const CATEGORIAS_DOC: Mapa = {
   otro: 'Otro',
 }
 
-export const TIPOS_EQUIPO: Mapa = {
-  camion: 'Camión',
-  autobus: 'Autobús',
-  vehiculo_liviano: 'Vehículo liviano',
-  maquinaria_pesada: 'Maquinaria pesada',
-  montacargas: 'Montacargas',
-  tractor: 'Tractor',
-  generador: 'Generador',
-  compresor: 'Compresor',
-  sistema_hidraulico: 'Sistema hidráulico',
-  reductor: 'Reductor',
-  turbina: 'Turbina',
-  transformador: 'Transformador',
-  bomba: 'Bomba',
-  otro: 'Otro',
-}
+// Agrupados por familia (el orden es el de los selectores). Maquinaria
+// pesada: lista de Andrea, 23/nov/2026 (migración 0122).
+export const GRUPOS_EQUIPO: { grupo: string; tipos: Mapa }[] = [
+  {
+    grupo: 'Vehículos',
+    tipos: { camion: 'Camión', autobus: 'Autobús', vehiculo_liviano: 'Vehículo liviano', cisterna: 'Cisterna' },
+  },
+  {
+    grupo: 'Maquinaria pesada',
+    tipos: {
+      camion_articulado: 'Camión articulado',
+      camion_roquero: 'Camión roquero',
+      cargador_frontal: 'Cargador frontal',
+      excavadora: 'Excavadora',
+      retroexcavadora: 'Retroexcavadora',
+      motoniveladora: 'Motoniveladora',
+      compactadora_asfalto: 'Compactadora de asfalto',
+      compactadora_tierra: 'Compactadora de tierra',
+      tractor: 'Tractor',
+      montacargas: 'Montacargas',
+      maquinaria_pesada: 'Otra maquinaria pesada',
+    },
+  },
+  {
+    grupo: 'Planta y equipos fijos',
+    tipos: {
+      generador: 'Generador',
+      compresor: 'Compresor',
+      sistema_hidraulico: 'Sistema hidráulico',
+      reductor: 'Reductor',
+      turbina: 'Turbina',
+      transformador: 'Transformador',
+      bomba: 'Bomba',
+    },
+  },
+  { grupo: 'Otro', tipos: { otro: 'Otro' } },
+]
+
+export const TIPOS_EQUIPO: Mapa = Object.assign({}, ...GRUPOS_EQUIPO.map((g) => g.tipos))
 
 export const COMPONENTES: Mapa = {
   motor: 'Motor',

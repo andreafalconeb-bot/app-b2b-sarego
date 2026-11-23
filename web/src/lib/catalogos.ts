@@ -43,14 +43,16 @@ export const FUENTES: Mapa = {
   otro: 'Otro',
 }
 
-export const SUCURSALES: Mapa = { '01': 'Caracas', '02': 'Valencia' }
+// '03' lo asignó la app B2B: Ciudad Bolívar no tiene código en el ERP
+// (Andrea, 23/nov/2026: "tenemos sucursal para el B2B también en Ciudad Bolívar").
+export const SUCURSALES: Mapa = { '01': 'Caracas', '02': 'Valencia', '03': 'Ciudad Bolívar' }
 
 // Curso 06, módulo 2: un buen prospecto cumple 4 de estos 5
 export const CRITERIOS = [
   { campo: 'crit_consumo', texto: '30 o más vehículos o equipos pesados, o planta que consume lubricante cada mes' },
   { campo: 'crit_divisas', texto: 'Paga en divisas o acepta indexación a la tasa BCV del día de pago' },
   { campo: 'crit_dolor', texto: 'Dolor visible: paradas, cauchos que no rinden, aceite dudoso, proveedor que falla' },
-  { campo: 'crit_zona', texto: 'Está en Caracas, Valencia o Maracay, o en una ruta que ya se despacha' },
+  { campo: 'crit_zona', texto: 'Está en Caracas, Valencia, Maracay, Ciudad Bolívar o Guayana, o en una ruta que ya se despacha' },
   { campo: 'crit_decisor', texto: 'Se puede llegar al decisor técnico (jefe de mantenimiento o de flota)' },
 ] as const
 

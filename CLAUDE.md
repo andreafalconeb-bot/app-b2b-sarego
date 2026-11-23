@@ -15,4 +15,7 @@
   Smart Assistance; un resultado crítico crea 3 compromisos (avisar en
   24 h, cambio de aceite, repetir la muestra); líneas: lubricantes,
   grasas y neumáticos; correo de la empresa en `mad4performance.com`.
+- Sucursales B2B: `01` Caracas, `02` Valencia y `03` Ciudad Bolívar (Andrea,
+  23/nov/2026; `03` lo asignó la app, el ERP no tiene código para Ciudad
+  Bolívar). Las Semillas deducen la sucursal del punto (`sucursalPorPunto`).
 - Todo texto de la interfaz en español de Venezuela, tuteando.

@@ -235,6 +235,9 @@ function EditarEquipo({ equipo, proyectoId, onCerrar, onHecho }: { equipo: Parti
       <div className="grid grid-2">
         <Campo etiqueta="Tipo">
           <select id="eq-tipo" value={f.tipo ?? 'otro'} onChange={(e) => set('tipo', e.target.value)}>
+            {f.tipo && !GRUPOS_EQUIPO.some((g) => f.tipo! in g.tipos) && (
+              <option value={f.tipo}>{TIPOS_EQUIPO[f.tipo] ?? f.tipo}</option>
+            )}
             {GRUPOS_EQUIPO.map((g) => (
               <optgroup key={g.grupo} label={g.grupo}>
                 {Object.entries(g.tipos).map(([k, v]) => (

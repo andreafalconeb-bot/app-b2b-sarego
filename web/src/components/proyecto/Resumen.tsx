@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, ok } from '../../lib/supabase'
 import { useSesion } from '../../lib/sesion'
-import { CRITERIOS, FUENTES, LINEAS, SEGMENTOS, SUCURSALES } from '../../lib/catalogos'
+import { CRITERIOS, FUENTES, GRUPOS_FLOTA, LINEAS, SEGMENTOS, SUCURSALES } from '../../lib/catalogos'
 import { fecha, numero } from '../../lib/formato'
 import { Campo, ErrorMsg, Modal, Selector, mensajeError } from '../ui'
 import type { PropsPestana } from '../../pages/Proyecto'
@@ -12,7 +12,7 @@ const EDITABLES = [
   'razon_social', 'nombre_comercial', 'rif', 'segmento', 'lineas', 'sucursal', 'ciudad', 'direccion',
   'telefono', 'email', 'web', 'fuente', 'fuente_detalle', 'num_vehiculos', 'num_equipos',
   'consumo_litros_anual', 'potencial_usd_anual', 'proveedor_actual', 'marca_actual', 'dolor',
-  'crit_consumo', 'crit_divisas', 'crit_dolor', 'crit_zona', 'crit_decisor',
+  'crit_consumo', 'crit_divisas', 'crit_dolor', 'crit_zona', 'crit_decisor', 'flota',
 ] as const
 type Editable = (typeof EDITABLES)[number]
 
@@ -37,6 +37,14 @@ export default function Resumen({ proyecto, puedeEditar, recargarProyecto }: Pro
     try {
       const cambios: Record<string, unknown> = {}
       for (const k of EDITABLES) if (JSON.stringify(f[k]) !== JSON.stringify(proyecto[k])) cambios[k] = f[k] === '' ? null : f[k]
+      // Con composición de flota, los totales salen de ella
+      if (cambios.flota) {
+        const t = totalesFlota(f.flota)
+        if (t.vehiculos || t.equipos) {
+          cambios.num_vehiculos = t.vehiculos || null
+          cambios.num_equipos = t.equipos || null
+        }
+      }
       ok(await supabase.from('b2b_proyectos').update(cambios).eq('id', proyecto.id))
       setMsg('Ficha guardada.')
       await recargarProyecto()
@@ -105,9 +113,19 @@ export default function Resumen({ proyecto, puedeEditar, recargarProyecto }: Pro
 
         <section className="tarjeta pila">
           <h2>Tamaño y situación actual</h2>
+          <ComposicionFlota flota={f.flota} puedeEditar={puedeEditar} onCambio={(fl) => set('flota', fl)} />
           <div className="grid grid-4">
-            {txt('num_vehiculos', 'Vehículos', 'number')}
-            {txt('num_equipos', 'Equipos', 'number')}
+            {totalesFlota(f.flota).vehiculos + totalesFlota(f.flota).equipos > 0 ? (
+              <>
+                <Campo etiqueta="Vehículos"><input disabled value={totalesFlota(f.flota).vehiculos} /></Campo>
+                <Campo etiqueta="Equipos"><input disabled value={totalesFlota(f.flota).equipos} /></Campo>
+              </>
+            ) : (
+              <>
+                {txt('num_vehiculos', 'Vehículos', 'number')}
+                {txt('num_equipos', 'Equipos', 'number')}
+              </>
+            )}
             {txt('consumo_litros_anual', 'Consumo anual (L)', 'number')}
             {txt('potencial_usd_anual', 'Potencial (US$/año)', 'number')}
           </div>
@@ -271,5 +289,67 @@ function CambioEtapa({ abierto, proyecto, onCerrar, onHecho }: { abierto: boolea
       )}
       <ErrorMsg error={error} />
     </Modal>
+  )
+}
+
+/** Vehículos = grupo "Vehículos"; equipos = maquinaria pesada y planta. */
+function totalesFlota(flota: Record<string, number> | null | undefined) {
+  let vehiculos = 0
+  let equipos = 0
+  for (const g of GRUPOS_FLOTA) {
+    for (const k of Object.keys(g.tipos)) {
+      const n = Number(flota?.[k] ?? 0)
+      if (g.grupo === 'Vehículos') vehiculos += n
+      else equipos += n
+    }
+  }
+  return { vehiculos, equipos }
+}
+
+/** Cuántas unidades de cada tipo tiene la cuenta, sin cargar una por una. */
+function ComposicionFlota({ flota, puedeEditar, onCambio }: {
+  flota: Record<string, number> | null | undefined
+  puedeEditar: boolean
+  onCambio: (f: Record<string, number>) => void
+}) {
+  const actual = flota ?? {}
+  const [abierto, setAbierto] = useState(Object.keys(actual).length > 0)
+  const set = (k: string, v: string) => {
+    const n = Math.max(0, Math.floor(Number(v) || 0))
+    const nueva = { ...actual }
+    if (n) nueva[k] = n
+    else delete nueva[k]
+    onCambio(nueva)
+  }
+  const resumen = GRUPOS_FLOTA.flatMap((g) => Object.entries(g.tipos))
+    .filter(([k]) => actual[k])
+    .map(([k, v]) => `${v}: ${actual[k]}`)
+  return (
+    <div className="pila" style={{ gap: 6 }}>
+      <div className="fila-entre">
+        <span className="chico">
+          <b>Composición de la flota:</b> {resumen.length ? resumen.join(' · ') : <span className="sec">sin cargar</span>}
+        </span>
+        <button className="chico" onClick={() => setAbierto(!abierto)}>{abierto ? 'Ocultar' : puedeEditar ? 'Cargar cantidades' : 'Ver detalle'}</button>
+      </div>
+      {abierto && (
+        <div className="pila" style={{ gap: 10, background: 'var(--superficie-2)', padding: 10, borderRadius: 6 }}>
+          {GRUPOS_FLOTA.map((g) => (
+            <div key={g.grupo}>
+              <div className="sec chico" style={{ fontWeight: 600, marginBottom: 4 }}>{g.grupo}</div>
+              <div className="grid" style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(150px, 1fr))', gap: 8 }}>
+                {Object.entries(g.tipos).map(([k, v]) => (
+                  <label key={k} className="campo">
+                    <span>{v}</span>
+                    <input type="number" min={0} inputMode="numeric" disabled={!puedeEditar} value={actual[k] ?? ''} onChange={(e) => set(k, e.target.value)} placeholder="0" />
+                  </label>
+                ))}
+              </div>
+            </div>
+          ))}
+          <span className="sec chico">Los totales de vehículos y equipos se calculan solos. Para tomar muestras de una unidad, regístrala en "Equipos y muestras".</span>
+        </div>
+      )}
+    </div>
   )
 }

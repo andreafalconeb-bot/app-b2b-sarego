@@ -176,11 +176,18 @@ export const GRUPOS_EQUIPO: { grupo: string; tipos: Mapa }[] = [
 
 export const TIPOS_EQUIPO: Mapa = Object.assign({}, ...GRUPOS_EQUIPO.map((g) => g.tipos))
 
+// Migración 0123: componentes de maquinaria pesada (Andrea, 23/nov/2026)
 export const COMPONENTES: Mapa = {
   motor: 'Motor',
-  transmision: 'Transmisión',
+  transmision: 'Transmisión (caja)',
+  caja_transferencia: 'Caja de transferencia',
+  convertidor_par: 'Convertidor de par',
   diferencial: 'Diferencial',
   mando_final: 'Mando final',
+  mando_final_delantero: 'Mando final delantero',
+  mando_final_trasero: 'Mando final trasero',
+  sistema_giro: 'Sistema de giro (swing)',
+  motor_traslacion: 'Motor de traslación',
   hidraulico: 'Hidráulico',
   reductor: 'Reductor',
   compresor: 'Compresor',

@@ -181,7 +181,7 @@ function PorZona({ proyectos, zonaPorId }: { proyectos: Proyecto[]; zonaPorId: M
         const items = grupos.get(z)!
         const sinResponsable = items.filter((x) => !x.responsable_id).length
         return (
-          <details key={z} className="tarjeta tabla-wrap" open={orden.length <= 4}>
+          <details key={z} className="tarjeta tabla-wrap" open>
             <summary className="fila-entre" style={{ cursor: 'pointer' }}>
               <b>{z}</b>
               <span className="sec chico">

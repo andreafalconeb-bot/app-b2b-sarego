@@ -67,6 +67,8 @@ export interface Proyecto {
   ultima_gestion_at: string | null
   proxima_gestion: string | null
   created_at: string
+  cliente_erp_id: string | null
+  semilla: Semilla | null
   ia_prioridad: 'alta' | 'media' | 'baja' | 'descartar' | null
   ia_resumen: string | null
   ia_nivel: 'preliminar' | 'completa' | null
@@ -370,4 +372,35 @@ export interface Investigacion {
   costo_usd: number
   solicitado_por: string | null
   created_at: string
+}
+
+/** Lo que trajo el generador de semillas al importar (b2b_proyectos.semilla). */
+export interface Semilla {
+  terminos: string[]
+  centro: { lat: number; lng: number } | null
+  radio_m: number | null
+  sucursal: string | null
+  buscado_por: string | null
+  buscado_at: string
+  google: {
+    place_id: string
+    nombre: string
+    direccion: string | null
+    telefono: string | null
+    rating: number | null
+    maps_uri: string | null
+    lat: number | null
+    lng: number | null
+  }
+  cliente_erp: ClienteErpSemilla | null
+}
+
+export interface ClienteErpSemilla {
+  codigo: string
+  nombre: string
+  clasificacion: string
+  similitud: number
+  direccion: string | null
+  lat: number | null
+  lng: number | null
 }

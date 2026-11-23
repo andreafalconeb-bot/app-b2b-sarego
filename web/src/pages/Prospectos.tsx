@@ -172,6 +172,7 @@ function FichaProyecto({ x }: { x: Proyecto }) {
         {x.compromisos_vencidos > 0 && <Pill tono="alerta">{x.compromisos_vencidos} vencido(s)</Pill>}
         {x.muestras_criticas_abiertas > 0 && <Pill tono="critico">Muestra crítica</Pill>}
         {x.ia_prioridad && <PillIA p={x.ia_prioridad} />}
+        {(x.lat == null || x.lng == null) && <Pill tono="critico">Sin ubicación</Pill>}
       </div>
     </Link>
   )

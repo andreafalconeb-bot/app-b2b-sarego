@@ -3,7 +3,9 @@ import { Link } from 'react-router-dom'
 import L from 'leaflet'
 import 'leaflet/dist/leaflet.css'
 import { supabase } from '../lib/supabase'
-import { usePermisos } from '../lib/sesion'
+import { usePermisos, useSesion } from '../lib/sesion'
+import { COLORES, capaBase, distanciaMetros, enlaceGoogleMaps, iconoErp, iconoPin, iconoPunto, textoDistancia } from '../lib/mapa'
+import type { Semilla } from '../lib/tipos'
 import { SEGMENTOS, SUCURSALES } from '../lib/catalogos'
 import { Campo, ErrorMsg, Pill, Selector, Vacio, mensajeError } from '../components/ui'
 
@@ -16,7 +18,17 @@ interface ResultadoPlaces {
   telefono: string | null
   rating: number | null
   mapsUri: string | null
-  clienteErp: { codigoSarego: string; nombreErp: string; clasificacion: string } | null
+  clienteErp: {
+    codigoSarego: string
+    nombreErp: string
+    clasificacion: string
+    similitud: number
+    direccionErp: string | null
+    latErp: number | null
+    lngErp: number | null
+  } | null
+  // Palabras de búsqueda con las que apareció (puede ser más de una)
+  terminos?: string[]
 }
 interface Duplicado {
   codigo: string
@@ -28,9 +40,6 @@ interface Punto {
   lng: number
 }
 
-// Tiles de OpenStreetMap: gratis y sin clave (los mismos de la app retail,
-// ver web/src/lib/mapaTiles.ts allá: CARTO empezó a pedir API key).
-const TILE_URL = 'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png'
 
 // Atajos a zonas industriales (curso 06, módulo 2: Caracas, Valencia,
 // Maracay y las rutas que ya se despachan). Mueven el mapa y marcan el punto.
@@ -75,27 +84,23 @@ function sucursalPorPunto(p: Punto): string {
   return p.lng < -67.25 ? '02' : '01'
 }
 
-function iconoPunto(): L.DivIcon {
-  return L.divIcon({
-    className: '',
-    html: '<span style="display:block;width:22px;height:22px;border-radius:50% 50% 50% 0;background:#e8a23a;border:2px solid #123a4a;transform:rotate(-45deg);box-shadow:0 1px 3px rgba(0,0,0,.45)"></span>',
-    iconSize: [22, 22],
-    iconAnchor: [11, 22],
-  })
+const CLASIFICACION_ERP: Record<string, string> = {
+  activo: 'activo',
+  en_riesgo: 'en riesgo',
+  inactivo: 'inactivo',
+  sin_compras: 'sin compras',
 }
 
-function iconoResultado(estado: 'nueva' | 'cliente' | 'duplicada' | 'elegida'): L.DivIcon {
-  const color = { nueva: '#0c5a7a', cliente: '#1f7a4d', duplicada: '#a86400', elegida: '#e8a23a' }[estado]
-  return L.divIcon({
-    className: '',
-    html: `<span style="display:block;width:14px;height:14px;border-radius:50%;background:${color};border:2px solid #fff;box-shadow:0 1px 3px rgba(0,0,0,.45)"></span>`,
-    iconSize: [14, 14],
-    iconAnchor: [7, 7],
-  })
+function estadoResultado(r: ResultadoPlaces, elegidos: Set<string>, dups: Record<string, Duplicado[]>) {
+  if (elegidos.has(r.googlePlaceId)) return 'elegida' as const
+  if (r.clienteErp) return 'cliente' as const
+  if ((dups[r.googlePlaceId] ?? []).length) return 'duplicada' as const
+  return 'nueva' as const
 }
 
 export default function Semillas() {
   const p = usePermisos()
+  const { yo } = useSesion()
   const [punto, setPunto] = useState<Punto | null>(null)
   const [radioKm, setRadioKm] = useState(5)
   const [sucursal, setSucursal] = useState('01')
@@ -129,12 +134,7 @@ export default function Semillas() {
       }
       if (mapaRef.current) return
       const mapa = L.map(nodo).setView([10.3, -67.4], 9)
-      L.tileLayer(TILE_URL, {
-        attribution: '© OpenStreetMap contributors',
-        subdomains: ['a', 'b', 'c'],
-        maxZoom: 19,
-        detectRetina: true,
-      }).addTo(mapa)
+      capaBase().addTo(mapa)
       mapa.on('click', (e: L.LeafletMouseEvent) => marcar({ lat: e.latlng.lat, lng: e.latlng.lng }))
       capaResultadosRef.current = L.layerGroup().addTo(mapa)
       mapaRef.current = mapa
@@ -149,7 +149,7 @@ export default function Semillas() {
     marcadorRef.current?.remove()
     circuloRef.current?.remove()
     if (!punto) return
-    const m = L.marker([punto.lat, punto.lng], { icon: iconoPunto(), draggable: true }).addTo(mapa)
+    const m = L.marker([punto.lat, punto.lng], { icon: iconoPin(COLORES.elegida), draggable: true }).addTo(mapa)
     m.on('dragend', () => {
       const ll = m.getLatLng()
       marcar({ lat: ll.lat, lng: ll.lng })
@@ -165,26 +165,43 @@ export default function Semillas() {
     }).addTo(mapa)
   }, [punto, radioKm, marcar])
 
-  // Resultados en el mapa, coloreados según si son nuevos, clientes o duplicados
+  // Resultados en el mapa, coloreados según si son nuevos, clientes o
+  // duplicados. Si ya es cliente en Profit y el ERP tiene coordenadas, se
+  // dibuja también la ubicación registrada (cuadrado verde) unida con una
+  // línea punteada, para comparar.
   useEffect(() => {
     const capa = capaResultadosRef.current
     if (!capa) return
     capa.clearLayers()
     for (const r of resultados) {
       if (r.lat == null || r.lng == null) continue
-      const estado = elegidos.has(r.googlePlaceId)
-        ? 'elegida'
-        : r.clienteErp
-          ? 'cliente'
-          : (dups[r.googlePlaceId] ?? []).length
-            ? 'duplicada'
-            : 'nueva'
-      L.marker([r.lat, r.lng], { icon: iconoResultado(estado) })
-        .bindTooltip(r.nombre)
+      const estado = estadoResultado(r, elegidos, dups)
+      const terminos = r.terminos?.length ? `<br><small>Encontrada con: ${escapar(r.terminos.join(', '))}</small>` : ''
+      L.marker([r.lat, r.lng], { icon: iconoPunto(COLORES[estado]) })
+        .bindTooltip(`<b>${escapar(r.nombre)}</b>${terminos}`)
         .on('click', () => alternar(r.googlePlaceId))
         .addTo(capa)
+      const e = r.clienteErp
+      if (e && e.latErp != null && e.lngErp != null) {
+        L.polyline([[r.lat, r.lng], [e.latErp, e.lngErp]], { color: COLORES.cliente, weight: 2, dashArray: '4 4' }).addTo(capa)
+        L.marker([e.latErp, e.lngErp], { icon: iconoErp() })
+          .bindTooltip(`<b>En Profit: ${escapar(e.nombreErp)}</b><br><small>${escapar(e.codigoSarego)} · ${escapar(e.direccionErp ?? '')}</small>`)
+          .addTo(capa)
+      }
     }
   }, [resultados, dups, elegidos])
+
+  const verEnMapa = (r: ResultadoPlaces) => {
+    const mapa = mapaRef.current
+    if (!mapa || r.lat == null || r.lng == null) return
+    const e = r.clienteErp
+    if (e && e.latErp != null && e.lngErp != null) {
+      mapa.fitBounds(L.latLngBounds([[r.lat, r.lng], [e.latErp, e.lngErp]]), { padding: [60, 60], maxZoom: 17 })
+    } else {
+      mapa.setView([r.lat, r.lng], Math.max(mapa.getZoom(), 16))
+    }
+    document.querySelector('.leaflet-container')?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }
 
   const irAZona = (nombre: string) => {
     const z = ZONAS[nombre]
@@ -240,8 +257,11 @@ export default function Semillas() {
 
   const importar = async () => {
     setError(null)
-    const filas = resultados
-      .filter((r) => elegidos.has(r.googlePlaceId))
+    const elegidas = resultados.filter((r) => elegidos.has(r.googlePlaceId))
+    const sinCoordenadas = elegidas.filter((r) => r.lat == null || r.lng == null)
+    if (sinCoordenadas.length) return setError(`No se pueden importar sin coordenadas: ${sinCoordenadas.map((r) => r.nombre).join(', ')}.`)
+    const ahora = new Date().toISOString()
+    const filas = elegidas
       .map((r) => ({
         razon_social: r.nombre,
         nombre_comercial: r.nombre,
@@ -256,6 +276,35 @@ export default function Semillas() {
         fuente_detalle: r.mapsUri,
         google_place_id: r.googlePlaceId,
         etapa: 'semilla',
+        semilla: {
+          terminos: r.terminos ?? [],
+          centro: punto,
+          radio_m: Math.round(radioKm * 1000),
+          sucursal,
+          buscado_por: yo?.id ?? null,
+          buscado_at: ahora,
+          google: {
+            place_id: r.googlePlaceId,
+            nombre: r.nombre,
+            direccion: r.direccion,
+            telefono: r.telefono,
+            rating: r.rating,
+            maps_uri: r.mapsUri,
+            lat: r.lat,
+            lng: r.lng,
+          },
+          cliente_erp: r.clienteErp
+            ? {
+                codigo: r.clienteErp.codigoSarego,
+                nombre: r.clienteErp.nombreErp,
+                clasificacion: r.clienteErp.clasificacion,
+                similitud: r.clienteErp.similitud,
+                direccion: r.clienteErp.direccionErp,
+                lat: r.clienteErp.latErp,
+                lng: r.clienteErp.lngErp,
+              }
+            : null,
+        } satisfies Semilla,
       }))
     if (!filas.length) return
     const { error } = await supabase.from('b2b_proyectos').insert(filas)
@@ -325,6 +374,7 @@ export default function Semillas() {
                 <span><span className="punto" style={{ background: '#1f7a4d' }} /> cliente Profit</span>
                 <span><span className="punto" style={{ background: '#a86400' }} /> ya en B2B</span>
                 <span><span className="punto" style={{ background: '#e8a23a' }} /> elegida</span>
+                <span><span style={{ display: 'inline-block', width: 10, height: 10, background: '#1f7a4d' }} /> ubicación en Profit</span>
               </span>
             )}
           </div>
@@ -393,37 +443,76 @@ export default function Semillas() {
           </div>
           <div className="tabla-wrap">
             <table>
-              <thead><tr><th></th><th>Empresa</th><th>Teléfono</th><th>Ya conocida</th></tr></thead>
+              <thead><tr><th></th><th>Empresa</th><th>Encontrada con</th><th>Ya conocida</th><th></th></tr></thead>
               <tbody>
                 {resultados.map((r) => {
                   const d = dups[r.googlePlaceId] ?? []
+                  const e = r.clienteErp
+                  const sinCoord = r.lat == null || r.lng == null
+                  const ubicacionErp = e && e.latErp != null && e.lngErp != null
                   return (
-                    <tr key={r.googlePlaceId} className="clic" onClick={() => {
-                      if (r.lat != null && r.lng != null) mapaRef.current?.setView([r.lat, r.lng], Math.max(mapaRef.current.getZoom(), 15))
-                    }}>
-                      <td onClick={(e) => e.stopPropagation()}>
-                        <input type="checkbox" checked={elegidos.has(r.googlePlaceId)} onChange={() => alternar(r.googlePlaceId)} aria-label={'Elegir ' + r.nombre} />
+                    <tr key={r.googlePlaceId}>
+                      <td>
+                        <input type="checkbox" disabled={sinCoord} checked={elegidos.has(r.googlePlaceId)} onChange={() => alternar(r.googlePlaceId)} aria-label={'Elegir ' + r.nombre} />
+                      </td>
+                      <td className="min0">
+                        <b>{r.nombre}</b>
+                        <div className="sec chico">{r.direccion}</div>
+                        <div className="chico">
+                          {r.telefono && <span>📞 {r.telefono} · </span>}
+                          {sinCoord ? (
+                            <span style={{ color: 'var(--critico)' }}>Sin coordenadas: no se puede importar</span>
+                          ) : (
+                            <span className="mono sec">{r.lat!.toFixed(5)}, {r.lng!.toFixed(5)}</span>
+                          )}
+                          {r.mapsUri && <> · <a href={r.mapsUri} target="_blank" rel="noreferrer">Google Maps</a></>}
+                        </div>
                       </td>
                       <td>
-                        <b>{r.nombre}</b>
-                        <div className="sec chico">{r.direccion}{r.mapsUri && <> · <a href={r.mapsUri} target="_blank" rel="noreferrer" onClick={(e) => e.stopPropagation()}>Maps</a></>}</div>
+                        <div className="fila" style={{ gap: 4 }}>
+                          {(r.terminos ?? []).length ? (r.terminos ?? []).map((t) => <Pill key={t} tono="ambar">{t}</Pill>) : <span className="sec chico">—</span>}
+                        </div>
                       </td>
-                      <td className="chico">{r.telefono ?? '—'}</td>
-                      <td className="chico">
-                        {r.clienteErp && <Pill tono="acento">Cliente Profit {r.clienteErp.codigoSarego} · {r.clienteErp.clasificacion}</Pill>}{' '}
-                        {d.map((x) => <Pill key={x.codigo} tono="alerta">{x.codigo} · {x.responsable ?? 'Oficina'}</Pill>)}
-                        {!r.clienteErp && !d.length && <span className="sec">Nueva</span>}
+                      <td className="chico" style={{ minWidth: 220 }}>
+                        {e && (
+                          <div className="pila" style={{ gap: 2 }}>
+                            <span>
+                              <Pill tono="ok">Ya es cliente en Profit</Pill>
+                            </span>
+                            <b>{e.nombreErp}</b>
+                            <span className="sec">
+                              {e.codigoSarego} · {CLASIFICACION_ERP[e.clasificacion] ?? e.clasificacion} · {Math.round(e.similitud * 100)}% parecido
+                            </span>
+                            {e.direccionErp && <span className="sec">{e.direccionErp}</span>}
+                            {ubicacionErp ? (
+                              <span>
+                                Ubicación en el ERP:{' '}
+                                {!sinCoord && <b>a {textoDistancia(distanciaMetros({ lat: r.lat!, lng: r.lng! }, { lat: e.latErp!, lng: e.lngErp! }))}</b>}{' '}
+                                <a href={enlaceGoogleMaps(e.latErp!, e.lngErp!)} target="_blank" rel="noreferrer">abrir</a>
+                              </span>
+                            ) : (
+                              <span style={{ color: 'var(--alerta)' }}>El ERP no tiene coordenadas de este cliente</span>
+                            )}
+                          </div>
+                        )}
+                        {d.map((x) => <div key={x.codigo}><Pill tono="alerta">Ya en B2B: {x.codigo} · {x.responsable ?? 'Oficina'}</Pill></div>)}
+                        {!e && !d.length && <span className="sec">Nueva</span>}
                       </td>
+                      <td>{!sinCoord && <button className="chico" onClick={() => verEnMapa(r)}>Ver en el mapa</button>}</td>
                     </tr>
                   )
                 })}
               </tbody>
             </table>
           </div>
-          <p className="sec chico" style={{ margin: 0 }}>Toca una fila para ubicarla en el mapa, o toca un punto del mapa para elegirla.</p>
+          <p className="sec chico" style={{ margin: 0 }}>Toca "Ver en el mapa" para ubicarla (si ya es cliente, también se ve dónde la tiene registrada Profit). Tocar un punto del mapa lo elige.</p>
         </section>
       )}
       {!buscando && resultados.length === 0 && !msg && punto && <Vacio>Ajusta el radio y toca "Buscar en este círculo".</Vacio>}
     </>
   )
+}
+
+function escapar(t: string): string {
+  return t.replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!)
 }

@@ -19,3 +19,9 @@
   23/nov/2026; `03` lo asignó la app, el ERP no tiene código para Ciudad
   Bolívar). Las Semillas deducen la sucursal del punto (`sucursalPorPunto`).
 - Todo texto de la interfaz en español de Venezuela, tuteando.
+- **Publicación:** Andrea (23/nov/2026) autorizó que Claude publique solo
+  los cambios de esta app: abrir el PR, unirlo a `main` cuando `tsc`, las
+  pruebas y el build pasen, revisar que el deploy a Cloudflare termine en
+  verde y avisarle qué se publicó. Si el cambio necesita una migración en
+  `app-retail-lubricantes`, se une primero esa (y se espera su workflow)
+  y después la de aquí.

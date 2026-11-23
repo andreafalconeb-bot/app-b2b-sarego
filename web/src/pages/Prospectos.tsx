@@ -7,12 +7,14 @@ import type { Proyecto } from '../lib/tipos'
 import { FUENTES, LINEAS, SEGMENTOS, SUCURSALES, etiqueta } from '../lib/catalogos'
 import { diasDesde, fecha } from '../lib/formato'
 import { COSTO_APROX, PRIORIDAD_IA, gastoDelMes, investigar, usd } from '../lib/ia'
+import { ordenZona, zonaDe } from '../lib/zonas'
 import { AvisoCache, Cargando, Campo, ErrorMsg, Modal, Pill, Selector, Vacio, mensajeError, useCarga } from '../components/ui'
 
 export default function Prospectos() {
   const { etapas, usuarios, yo } = useSesion()
   const p = usePermisos()
-  const [vista, setVista] = useState<'tablero' | 'lista'>('tablero')
+  const [vista, setVista] = useState<'tablero' | 'lista' | 'zonas'>('tablero')
+  const [zona, setZona] = useState('')
   const [texto, setTexto] = useState('')
   const [responsable, setResponsable] = useState('')
   const [segmento, setSegmento] = useState('')
@@ -30,6 +32,11 @@ export default function Prospectos() {
     [],
   )
   const proyectos = datos?.datos ?? []
+  const zonaPorId = useMemo(() => new Map(proyectos.map((x) => [x.id, zonaDe(x.lat, x.lng)])), [proyectos])
+  const zonasConDatos = useMemo(
+    () => [...new Set(zonaPorId.values())].sort((a, b) => ordenZona(a) - ordenZona(b)),
+    [zonaPorId],
+  )
 
   const filtrados = useMemo(() => {
     const t = texto.trim().toLowerCase()
@@ -39,11 +46,12 @@ export default function Prospectos() {
         if (x.responsable_id) return false
       } else if (responsable && x.responsable_id !== responsable) return false
       if (segmento && x.segmento !== segmento) return false
+      if (zona && zonaPorId.get(x.id) !== zona) return false
       if (soloAlertas && !x.estancado && !x.compromisos_vencidos && !x.muestras_criticas_abiertas) return false
       if (prioridadIA === 'sin' ? !!x.ia_nivel : prioridadIA && x.ia_prioridad !== prioridadIA) return false
       return true
     })
-  }, [proyectos, texto, responsable, segmento, soloAlertas, prioridadIA])
+  }, [proyectos, zonaPorId, texto, responsable, segmento, zona, soloAlertas, prioridadIA])
 
   const columnas = etapas.filter((e) => verCerrados || e.fase !== 'cierre')
   const ingenieros = usuarios.filter((u) => u.rol === 'ingeniero')
@@ -63,6 +71,7 @@ export default function Prospectos() {
           <div className="fila" role="group" aria-label="Vista">
             <button className={vista === 'tablero' ? 'primario chico' : 'chico'} onClick={() => setVista('tablero')}>Tablero</button>
             <button className={vista === 'lista' ? 'primario chico' : 'chico'} onClick={() => setVista('lista')}>Lista</button>
+            <button className={vista === 'zonas' ? 'primario chico' : 'chico'} onClick={() => setVista('zonas')}>Por zona</button>
           </div>
           {p.gestion && <button onClick={() => setLote(true)}>🔎 Investigar semillas con IA</button>}
           {puedeCrear && <button className="primario" onClick={() => setNuevo(true)}>+ Nuevo prospecto</button>}
@@ -87,6 +96,9 @@ export default function Prospectos() {
           )}
           <Campo etiqueta="Segmento">
             <Selector valor={segmento} onCambio={setSegmento} opciones={SEGMENTOS} vacio="Todos" />
+          </Campo>
+          <Campo etiqueta="Zona">
+            <Selector valor={zona} onCambio={setZona} opciones={Object.fromEntries(zonasConDatos.map((z) => [z, z]))} vacio="Todas" />
           </Campo>
           <Campo etiqueta="Prioridad según la IA">
             <Selector valor={prioridadIA} onCambio={setPrioridadIA} opciones={{ ...PRIORIDAD_IA, sin: 'Sin investigar' }} vacio="Todas" />
@@ -125,6 +137,8 @@ export default function Prospectos() {
             )
           })}
         </div>
+      ) : vista === 'zonas' ? (
+        <PorZona proyectos={filtrados} zonaPorId={zonaPorId} />
       ) : (
         <div className="tarjeta tabla-wrap">
           <TablaProyectos proyectos={filtrados} />
@@ -149,6 +163,37 @@ export default function Prospectos() {
         />
       )}
     </>
+  )
+}
+
+/** Prospectos agrupados por zona (sale de las coordenadas, ver lib/zonas). */
+function PorZona({ proyectos, zonaPorId }: { proyectos: Proyecto[]; zonaPorId: Map<string, string> }) {
+  if (!proyectos.length) return <div className="tarjeta"><Vacio>No hay proyectos con estos filtros.</Vacio></div>
+  const grupos = new Map<string, Proyecto[]>()
+  for (const x of proyectos) {
+    const z = zonaPorId.get(x.id) ?? zonaDe(x.lat, x.lng)
+    grupos.set(z, [...(grupos.get(z) ?? []), x])
+  }
+  const orden = [...grupos.keys()].sort((a, b) => ordenZona(a) - ordenZona(b))
+  return (
+    <div className="pila">
+      {orden.map((z) => {
+        const items = grupos.get(z)!
+        const sinResponsable = items.filter((x) => !x.responsable_id).length
+        return (
+          <details key={z} className="tarjeta tabla-wrap" open={orden.length <= 4}>
+            <summary className="fila-entre" style={{ cursor: 'pointer' }}>
+              <b>{z}</b>
+              <span className="sec chico">
+                {items.length} prospecto{items.length === 1 ? '' : 's'}
+                {sinResponsable ? ` · ${sinResponsable} sin asignar` : ''}
+              </span>
+            </summary>
+            <TablaProyectos proyectos={items} />
+          </details>
+        )
+      })}
+    </div>
   )
 }
 

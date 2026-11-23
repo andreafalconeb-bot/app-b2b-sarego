@@ -67,6 +67,12 @@ export interface Proyecto {
   ultima_gestion_at: string | null
   proxima_gestion: string | null
   created_at: string
+  cliente_erp_id: string | null
+  semilla: Semilla | null
+  ia_prioridad: 'alta' | 'media' | 'baja' | 'descartar' | null
+  ia_resumen: string | null
+  ia_nivel: 'preliminar' | 'completa' | null
+  ia_actualizado_at: string | null
   estancado: boolean
   compromisos_vencidos: number
   muestras_criticas_abiertas: number
@@ -323,4 +329,78 @@ export interface Notificacion {
   cuerpo: string | null
   leida: boolean
   created_at: string
+}
+
+export type SiNo = 'si' | 'no' | 'desconocido'
+
+/** Resultado de la investigación con IA (Edge Function b2b-investigar). */
+export interface ResultadoIA {
+  existe: 'si' | 'no' | 'dudoso'
+  resumen: string
+  segmento: string | null
+  actividad: string
+  tiene_flota_o_planta: SiNo
+  flota_estimada: string | null
+  evidencia_flota: string | null
+  lineas_interes: string[]
+  ciudad: string | null
+  web: string | null
+  redes: { red: string; url: string }[]
+  telefonos: string[]
+  correos: string[]
+  contactos: { nombre: string; cargo: string | null; fuente_url: string | null }[]
+  senales: { tipo: string; detalle: string; fuente_url: string | null }[]
+  criterios: { consumo: SiNo; divisas: SiNo; dolor: SiNo; zona: SiNo; decisor: SiNo }
+  marcas_que_usa: string[]
+  prioridad: 'alta' | 'media' | 'baja' | 'descartar'
+  razon_prioridad: string
+  primer_mensaje: string
+}
+
+export interface Investigacion {
+  id: string
+  proyecto_id: string
+  tipo: 'preliminar' | 'completa'
+  estado: 'ok' | 'error'
+  resultado: ResultadoIA | null
+  fuentes: { url: string; titulo: string }[]
+  error: string | null
+  modelo: string
+  busquedas: number
+  tokens_entrada: number
+  tokens_salida: number
+  costo_usd: number
+  solicitado_por: string | null
+  created_at: string
+}
+
+/** Lo que trajo el generador de semillas al importar (b2b_proyectos.semilla). */
+export interface Semilla {
+  terminos: string[]
+  centro: { lat: number; lng: number } | null
+  radio_m: number | null
+  sucursal: string | null
+  buscado_por: string | null
+  buscado_at: string
+  google: {
+    place_id: string
+    nombre: string
+    direccion: string | null
+    telefono: string | null
+    rating: number | null
+    maps_uri: string | null
+    lat: number | null
+    lng: number | null
+  }
+  cliente_erp: ClienteErpSemilla | null
+}
+
+export interface ClienteErpSemilla {
+  codigo: string
+  nombre: string
+  clasificacion: string
+  similitud: number
+  direccion: string | null
+  lat: number | null
+  lng: number | null
 }

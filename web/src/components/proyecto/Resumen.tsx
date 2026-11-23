@@ -6,6 +6,7 @@ import { fecha, numero } from '../../lib/formato'
 import { Campo, ErrorMsg, Modal, Selector, mensajeError } from '../ui'
 import type { PropsPestana } from '../../pages/Proyecto'
 import type { Proyecto } from '../../lib/tipos'
+import UbicacionSemilla from './UbicacionSemilla'
 
 const EDITABLES = [
   'razon_social', 'nombre_comercial', 'rif', 'segmento', 'lineas', 'sucursal', 'ciudad', 'direccion',
@@ -61,6 +62,7 @@ export default function Resumen({ proyecto, puedeEditar, recargarProyecto }: Pro
   return (
     <div className="grid" style={{ gridTemplateColumns: 'minmax(0, 2fr) minmax(260px, 1fr)', alignItems: 'start' }}>
       <div className="pila min0">
+        <UbicacionSemilla proyecto={proyecto} puedeEditar={puedeEditar} onCambio={recargarProyecto} />
         <section className="tarjeta pila">
           <h2>Datos de la empresa</h2>
           <div className="grid grid-2">

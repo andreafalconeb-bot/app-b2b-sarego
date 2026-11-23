@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { supabase, ok } from '../lib/supabase'
 import { leerConCache } from '../lib/offline'
@@ -6,6 +6,7 @@ import { usePermisos, useSesion } from '../lib/sesion'
 import type { Proyecto } from '../lib/tipos'
 import { FUENTES, LINEAS, SEGMENTOS, SUCURSALES, etiqueta } from '../lib/catalogos'
 import { diasDesde, fecha } from '../lib/formato'
+import { COSTO_APROX, PRIORIDAD_IA, gastoDelMes, investigar, usd } from '../lib/ia'
 import { AvisoCache, Cargando, Campo, ErrorMsg, Modal, Pill, Selector, Vacio, mensajeError, useCarga } from '../components/ui'
 
 export default function Prospectos() {
@@ -16,10 +17,12 @@ export default function Prospectos() {
   const [responsable, setResponsable] = useState('')
   const [segmento, setSegmento] = useState('')
   const [soloAlertas, setSoloAlertas] = useState(false)
+  const [prioridadIA, setPrioridadIA] = useState('')
+  const [lote, setLote] = useState(false)
   const [verCerrados, setVerCerrados] = useState(false)
   const [nuevo, setNuevo] = useState(false)
 
-  const { datos, error, cargando } = useCarga(
+  const { datos, error, cargando, recargar } = useCarga(
     () =>
       leerConCache('proyectos', async () =>
         ok(await supabase.from('b2b_proyectos_resumen').select('*').order('updated_at', { ascending: false })) as Proyecto[],
@@ -37,9 +40,10 @@ export default function Prospectos() {
       } else if (responsable && x.responsable_id !== responsable) return false
       if (segmento && x.segmento !== segmento) return false
       if (soloAlertas && !x.estancado && !x.compromisos_vencidos && !x.muestras_criticas_abiertas) return false
+      if (prioridadIA === 'sin' ? !!x.ia_nivel : prioridadIA && x.ia_prioridad !== prioridadIA) return false
       return true
     })
-  }, [proyectos, texto, responsable, segmento, soloAlertas])
+  }, [proyectos, texto, responsable, segmento, soloAlertas, prioridadIA])
 
   const columnas = etapas.filter((e) => verCerrados || e.fase !== 'cierre')
   const ingenieros = usuarios.filter((u) => u.rol === 'ingeniero')
@@ -60,6 +64,7 @@ export default function Prospectos() {
             <button className={vista === 'tablero' ? 'primario chico' : 'chico'} onClick={() => setVista('tablero')}>Tablero</button>
             <button className={vista === 'lista' ? 'primario chico' : 'chico'} onClick={() => setVista('lista')}>Lista</button>
           </div>
+          {p.gestion && <button onClick={() => setLote(true)}>🔎 Investigar semillas con IA</button>}
           {puedeCrear && <button className="primario" onClick={() => setNuevo(true)}>+ Nuevo prospecto</button>}
         </div>
       </div>
@@ -82,6 +87,9 @@ export default function Prospectos() {
           )}
           <Campo etiqueta="Segmento">
             <Selector valor={segmento} onCambio={setSegmento} opciones={SEGMENTOS} vacio="Todos" />
+          </Campo>
+          <Campo etiqueta="Prioridad según la IA">
+            <Selector valor={prioridadIA} onCambio={setPrioridadIA} opciones={{ ...PRIORIDAD_IA, sin: 'Sin investigar' }} vacio="Todas" />
           </Campo>
           <div className="pila" style={{ justifyContent: 'flex-end' }}>
             <label className="check"><input type="checkbox" checked={soloAlertas} onChange={(e) => setSoloAlertas(e.target.checked)} /> Solo con alertas</label>
@@ -123,6 +131,16 @@ export default function Prospectos() {
         </div>
       )}
 
+      {p.gestion && (
+        <InvestigarLote
+          abierto={lote}
+          onCerrar={() => {
+            setLote(false)
+            void recargar()
+          }}
+          candidatos={filtrados.filter((x) => x.etapa === 'semilla' && !x.ia_nivel)}
+        />
+      )}
       {puedeCrear && (
         <NuevoProspecto
           abierto={nuevo}
@@ -153,6 +171,7 @@ function FichaProyecto({ x }: { x: Proyecto }) {
         {x.estancado && <Pill tono="alerta">Estancado {dias} d</Pill>}
         {x.compromisos_vencidos > 0 && <Pill tono="alerta">{x.compromisos_vencidos} vencido(s)</Pill>}
         {x.muestras_criticas_abiertas > 0 && <Pill tono="critico">Muestra crítica</Pill>}
+        {x.ia_prioridad && <PillIA p={x.ia_prioridad} />}
       </div>
     </Link>
   )
@@ -172,6 +191,7 @@ export function TablaProyectos({ proyectos }: { proyectos: Proyecto[] }) {
           <th>Puntaje</th>
           <th>Última gestión</th>
           <th>Próxima</th>
+          <th>IA</th>
           <th>Alertas</th>
         </tr>
       </thead>
@@ -188,6 +208,7 @@ export function TablaProyectos({ proyectos }: { proyectos: Proyecto[] }) {
             <td className="num">{x.puntaje}/5</td>
             <td className="num">{fecha(x.ultima_gestion_at)}</td>
             <td className="num">{fecha(x.proxima_gestion)}</td>
+            <td>{x.ia_prioridad ? <PillIA p={x.ia_prioridad} /> : <span className="sec chico">—</span>}</td>
             <td>
               <div className="fila">
                 {x.estancado && <Pill tono="alerta">Estancado</Pill>}
@@ -366,6 +387,116 @@ function NuevoProspecto({ abierto, onCerrar, responsablePropio }: { abierto: boo
         </div>
       )}
       <ErrorMsg error={error} />
+    </Modal>
+  )
+}
+
+function PillIA({ p }: { p: string }) {
+  const tono = p === 'alta' ? 'ok' : p === 'media' ? 'acento' : p === 'baja' ? 'alerta' : 'critico'
+  return <Pill tono={tono}>IA: {p}</Pill>
+}
+
+/** Investigación preliminar de varias semillas, una por una, con el costo
+ * a la vista. Andrea: "realiza una búsqueda preliminar antes de gastar". */
+function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; onCerrar: () => void; candidatos: Proyecto[] }) {
+  const [cantidad, setCantidad] = useState(5)
+  const [estado, setEstado] = useState<'listo' | 'corriendo' | 'terminado'>('listo')
+  const [hechas, setHechas] = useState<{ nombre: string; costo: number; prioridad: string | null; error: string | null }[]>([])
+  const [presupuesto, setPresupuesto] = useState<{ gasto: number; tope: number } | null>(null)
+  const parar = useRef(false)
+
+  const abrir = async () => {
+    setEstado('listo')
+    setHechas([])
+    setCantidad(Math.min(5, candidatos.length))
+    setPresupuesto(await gastoDelMes().catch(() => null))
+  }
+  const [vistoAbierto, setVistoAbierto] = useState(false)
+  if (abierto && !vistoAbierto) {
+    setVistoAbierto(true)
+    void abrir()
+  }
+  if (!abierto && vistoAbierto) setVistoAbierto(false)
+
+  const n = Math.min(cantidad, candidatos.length)
+  const total = hechas.reduce((a, h) => a + h.costo, 0)
+
+  const correr = async () => {
+    parar.current = false
+    setEstado('corriendo')
+    for (const x of candidatos.slice(0, n)) {
+      if (parar.current) break
+      try {
+        const inv = await investigar(x.id, 'preliminar')
+        setHechas((h) => [...h, { nombre: x.nombre_comercial || x.razon_social, costo: Number(inv.costo_usd), prioridad: inv.resultado?.prioridad ?? null, error: null }])
+      } catch (e) {
+        const m = mensajeError(e)
+        setHechas((h) => [...h, { nombre: x.nombre_comercial || x.razon_social, costo: 0, prioridad: null, error: m }])
+        if (/tope de gasto|ANTHROPIC_API_KEY|no es válida|señal/i.test(m)) break
+      }
+    }
+    setEstado('terminado')
+  }
+
+  return (
+    <Modal
+      abierto={abierto}
+      titulo="Investigación preliminar con IA"
+      onCerrar={() => {
+        parar.current = true
+        onCerrar()
+      }}
+      pie={
+        estado === 'corriendo' ? (
+          <button onClick={() => (parar.current = true)}>Detener después de la actual</button>
+        ) : (
+          <>
+            <button onClick={onCerrar}>Cerrar</button>
+            {estado === 'listo' && (
+              <button className="primario" disabled={!n} onClick={() => void correr()}>
+                Investigar {n} (~{usd(n * COSTO_APROX.preliminar)})
+              </button>
+            )}
+          </>
+        )
+      }
+    >
+      <p className="chico" style={{ margin: 0 }}>
+        Para cada semilla sin investigar de la lista filtrada, hace 2 búsquedas en la web y dice si la empresa existe, a qué se dedica, si tiene flota o planta, sus redes y una prioridad. Después puedes hacer la investigación completa solo de las que valen la pena.
+      </p>
+      <div className="fila">
+        <span>Hay <b>{candidatos.length}</b> semillas sin investigar.</span>
+        {presupuesto && (
+          <span className="sec chico">Gasto del mes: {usd(presupuesto.gasto)} de {usd(presupuesto.tope)}</span>
+        )}
+      </div>
+      {estado === 'listo' && candidatos.length > 0 && (
+        <Campo etiqueta="Cuántas investigar ahora (empieza con pocas para ver el costo real)">
+          <input type="number" min={1} max={candidatos.length} value={cantidad} onChange={(e) => setCantidad(Math.max(1, Number(e.target.value) || 1))} style={{ maxWidth: 120 }} />
+        </Campo>
+      )}
+      {hechas.length > 0 && (
+        <div className="tabla-wrap">
+          <table>
+            <thead><tr><th>Empresa</th><th>Resultado</th><th>Costo</th></tr></thead>
+            <tbody>
+              {hechas.map((h, i) => (
+                <tr key={i}>
+                  <td>{h.nombre}</td>
+                  <td>{h.error ? <span className="chico" style={{ color: 'var(--critico)' }}>{h.error}</span> : h.prioridad ? <PillIA p={h.prioridad} /> : '—'}</td>
+                  <td className="num">{usd(h.costo)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {estado !== 'listo' && (
+        <div className="aviso">
+          {estado === 'corriendo' ? `Investigando ${hechas.length + 1} de ${n}…` : `Terminado: ${hechas.filter((h) => !h.error).length} investigadas.`} Costo real: <b>{usd(total)}</b>
+          {hechas.length > 0 && ` · promedio ${usd(total / Math.max(1, hechas.filter((h) => !h.error).length))} por empresa`}
+        </div>
+      )}
     </Modal>
   )
 }

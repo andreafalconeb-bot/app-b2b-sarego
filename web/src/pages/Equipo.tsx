@@ -281,7 +281,7 @@ function Limites() {
 }
 
 function Ajustes() {
-  const { datos, error, recargar } = useCarga(async () => ok(await supabase.from('b2b_config').select('*').single()) as { dias_estancado: number; horas_aviso_critico: number }, [])
+  const { datos, error, recargar } = useCarga(async () => ok(await supabase.from('b2b_config').select('*').single()) as { dias_estancado: number; horas_aviso_critico: number; ia_presupuesto_mensual_usd: number }, [])
   const [err, setErr] = useState<string | null>(null)
   const guardar = async (c: Record<string, number>) => {
     try {
@@ -300,6 +300,10 @@ function Ajustes() {
       <Campo etiqueta="Horas para avisar al cliente un resultado crítico">
         <input type="number" defaultValue={datos.horas_aviso_critico} onBlur={(e) => void guardar({ horas_aviso_critico: Number(e.target.value) })} />
       </Campo>
+      <Campo etiqueta="Tope de gasto mensual de la investigación con IA (US$)">
+        <input type="number" min={0} step={1} defaultValue={datos.ia_presupuesto_mensual_usd} onBlur={(e) => void guardar({ ia_presupuesto_mensual_usd: Number(e.target.value) })} />
+      </Campo>
+      <p className="sec chico" style={{ margin: 0 }}>Al llegar al tope, nadie puede investigar hasta el mes siguiente. Una preliminar cuesta ~US$ 0,02 y una completa ~US$ 0,06.</p>
       <ErrorMsg error={err} />
     </section>
   )

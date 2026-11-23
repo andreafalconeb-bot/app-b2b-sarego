@@ -16,6 +16,7 @@ import EquiposMuestras from '../components/proyecto/EquiposMuestras'
 import Cotizaciones from '../components/proyecto/Cotizaciones'
 import Pilotos from '../components/proyecto/Pilotos'
 import EquipoTrabajo from '../components/proyecto/EquipoTrabajo'
+import InvestigacionIA from '../components/proyecto/InvestigacionIA'
 
 export interface Miembro {
   user_id: string
@@ -30,6 +31,7 @@ export interface PropsPestana {
 
 const PESTANAS = [
   ['resumen', 'Resumen'],
+  ['ia', 'Investigación IA'],
   ['linea', 'Línea de tiempo'],
   ['decisores', 'Decisores'],
   ['compromisos', 'Compromisos'],
@@ -139,6 +141,7 @@ export default function ProyectoPagina() {
       </div>
 
       {pestana === 'resumen' && <Resumen {...props} />}
+      {pestana === 'ia' && <InvestigacionIA {...props} />}
       {pestana === 'linea' && <LineaTiempo {...props} />}
       {pestana === 'decisores' && <Decisores {...props} />}
       {pestana === 'compromisos' && <Compromisos {...props} />}

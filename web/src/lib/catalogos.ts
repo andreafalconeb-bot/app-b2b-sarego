@@ -141,7 +141,16 @@ export const CATEGORIAS_DOC: Mapa = {
 export const GRUPOS_EQUIPO: { grupo: string; tipos: Mapa }[] = [
   {
     grupo: 'Vehículos',
-    tipos: { camion: 'Camión', autobus: 'Autobús', vehiculo_liviano: 'Vehículo liviano', cisterna: 'Cisterna' },
+    // Andrea, 23/nov/2026: flotas de carros, pickups y autobuses medianos y
+    // grandes (migración 0124).
+    tipos: {
+      carro: 'Carro',
+      pickup: 'Pickup',
+      camion: 'Camión',
+      autobus_mediano: 'Autobús mediano',
+      autobus_grande: 'Autobús grande',
+      cisterna: 'Cisterna',
+    },
   },
   {
     grupo: 'Maquinaria pesada',
@@ -174,7 +183,14 @@ export const GRUPOS_EQUIPO: { grupo: string; tipos: Mapa }[] = [
   { grupo: 'Otro', tipos: { otro: 'Otro' } },
 ]
 
-export const TIPOS_EQUIPO: Mapa = Object.assign({}, ...GRUPOS_EQUIPO.map((g) => g.tipos))
+// Tipos de antes de la migración 0124: se siguen mostrando en equipos ya
+// cargados, pero ya no se ofrecen para elegir.
+const TIPOS_ANTERIORES: Mapa = { vehiculo_liviano: 'Vehículo liviano (otro)', autobus: 'Autobús (sin tamaño)' }
+
+export const TIPOS_EQUIPO: Mapa = Object.assign({}, ...GRUPOS_EQUIPO.map((g) => g.tipos), TIPOS_ANTERIORES)
+
+/** Grupos que cuentan como vehículos o como equipos en la composición de la flota. */
+export const GRUPOS_FLOTA = GRUPOS_EQUIPO.filter((g) => g.grupo !== 'Otro')
 
 // Migración 0123: componentes de maquinaria pesada (Andrea, 23/nov/2026)
 export const COMPONENTES: Mapa = {

@@ -68,6 +68,8 @@ export interface Proyecto {
   proxima_gestion: string | null
   created_at: string
   cliente_erp_id: string | null
+  // Composición de la flota: {tipo de equipo: cantidad} (migración 0124)
+  flota: Record<string, number>
   semilla: Semilla | null
   ia_prioridad: 'alta' | 'media' | 'baja' | 'descartar' | null
   ia_resumen: string | null

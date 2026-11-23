@@ -54,6 +54,12 @@ const ZONAS: Record<string, Punto & { zoom: number }> = {
   'Maracay · Zona industrial San Vicente': { lat: 10.2203, lng: -67.5714, zoom: 13 },
   'La Victoria · Aragua': { lat: 10.2275, lng: -67.3333, zoom: 13 },
   'Puerto Cabello': { lat: 10.4731, lng: -68.0125, zoom: 13 },
+  'Ciudad Bolívar · Zona industrial La Sabanita': { lat: 8.1036, lng: -63.5306, zoom: 13 },
+  'Ciudad Bolívar · Centro y Marhuanta': { lat: 8.1222, lng: -63.5497, zoom: 13 },
+  'Puerto Ordaz · Zona industrial Matanzas': { lat: 8.2875, lng: -62.8139, zoom: 13 },
+  'Puerto Ordaz · Unare / Alta Vista': { lat: 8.2961, lng: -62.7411, zoom: 13 },
+  'San Félix · Zona industrial': { lat: 8.3575, lng: -62.6453, zoom: 13 },
+  'Upata · El Callao (minería)': { lat: 8.0128, lng: -62.4031, zoom: 11 },
 }
 
 const TERMINOS = [
@@ -78,9 +84,11 @@ const TERMINOS = [
 const RADIO_MAX_KM = 50
 const RADIOS_RAPIDOS = [1, 2, 5, 10, 20]
 
-/** Sucursal que atiende un punto: de La Victoria hacia el oeste (Aragua y
- * Carabobo) es Valencia; el resto, Caracas. Se puede cambiar a mano. */
+/** Sucursal que atiende un punto: el estado Bolívar (al sur del Orinoco y
+ * al este de -66) es Ciudad Bolívar; de La Victoria hacia el oeste (Aragua
+ * y Carabobo) es Valencia; el resto, Caracas. Se puede cambiar a mano. */
 function sucursalPorPunto(p: Punto): string {
+  if (p.lat < 8.7 && p.lng > -66) return '03'
   return p.lng < -67.25 ? '02' : '01'
 }
 
@@ -133,7 +141,7 @@ export default function Semillas() {
         return
       }
       if (mapaRef.current) return
-      const mapa = L.map(nodo).setView([10.3, -67.4], 9)
+      const mapa = L.map(nodo).setView([9.3, -65.6], 7)
       capaBase().addTo(mapa)
       mapa.on('click', (e: L.LeafletMouseEvent) => marcar({ lat: e.latlng.lat, lng: e.latlng.lng }))
       capaResultadosRef.current = L.layerGroup().addTo(mapa)

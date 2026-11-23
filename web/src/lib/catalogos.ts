@@ -43,14 +43,16 @@ export const FUENTES: Mapa = {
   otro: 'Otro',
 }
 
-export const SUCURSALES: Mapa = { '01': 'Caracas', '02': 'Valencia' }
+// '03' lo asignó la app B2B: Ciudad Bolívar no tiene código en el ERP
+// (Andrea, 23/nov/2026: "tenemos sucursal para el B2B también en Ciudad Bolívar").
+export const SUCURSALES: Mapa = { '01': 'Caracas', '02': 'Valencia', '03': 'Ciudad Bolívar' }
 
 // Curso 06, módulo 2: un buen prospecto cumple 4 de estos 5
 export const CRITERIOS = [
   { campo: 'crit_consumo', texto: '30 o más vehículos o equipos pesados, o planta que consume lubricante cada mes' },
   { campo: 'crit_divisas', texto: 'Paga en divisas o acepta indexación a la tasa BCV del día de pago' },
   { campo: 'crit_dolor', texto: 'Dolor visible: paradas, cauchos que no rinden, aceite dudoso, proveedor que falla' },
-  { campo: 'crit_zona', texto: 'Está en Caracas, Valencia o Maracay, o en una ruta que ya se despacha' },
+  { campo: 'crit_zona', texto: 'Está en Caracas, Valencia, Maracay, Ciudad Bolívar o Guayana, o en una ruta que ya se despacha' },
   { campo: 'crit_decisor', texto: 'Se puede llegar al decisor técnico (jefe de mantenimiento o de flota)' },
 ] as const
 
@@ -134,22 +136,45 @@ export const CATEGORIAS_DOC: Mapa = {
   otro: 'Otro',
 }
 
-export const TIPOS_EQUIPO: Mapa = {
-  camion: 'Camión',
-  autobus: 'Autobús',
-  vehiculo_liviano: 'Vehículo liviano',
-  maquinaria_pesada: 'Maquinaria pesada',
-  montacargas: 'Montacargas',
-  tractor: 'Tractor',
-  generador: 'Generador',
-  compresor: 'Compresor',
-  sistema_hidraulico: 'Sistema hidráulico',
-  reductor: 'Reductor',
-  turbina: 'Turbina',
-  transformador: 'Transformador',
-  bomba: 'Bomba',
-  otro: 'Otro',
-}
+// Agrupados por familia (el orden es el de los selectores). Maquinaria
+// pesada: lista de Andrea, 23/nov/2026 (migración 0122).
+export const GRUPOS_EQUIPO: { grupo: string; tipos: Mapa }[] = [
+  {
+    grupo: 'Vehículos',
+    tipos: { camion: 'Camión', autobus: 'Autobús', vehiculo_liviano: 'Vehículo liviano', cisterna: 'Cisterna' },
+  },
+  {
+    grupo: 'Maquinaria pesada',
+    tipos: {
+      camion_articulado: 'Camión articulado',
+      camion_roquero: 'Camión roquero',
+      cargador_frontal: 'Cargador frontal',
+      excavadora: 'Excavadora',
+      retroexcavadora: 'Retroexcavadora',
+      motoniveladora: 'Motoniveladora',
+      compactadora_asfalto: 'Compactadora de asfalto',
+      compactadora_tierra: 'Compactadora de tierra',
+      tractor: 'Tractor',
+      montacargas: 'Montacargas',
+      maquinaria_pesada: 'Otra maquinaria pesada',
+    },
+  },
+  {
+    grupo: 'Planta y equipos fijos',
+    tipos: {
+      generador: 'Generador',
+      compresor: 'Compresor',
+      sistema_hidraulico: 'Sistema hidráulico',
+      reductor: 'Reductor',
+      turbina: 'Turbina',
+      transformador: 'Transformador',
+      bomba: 'Bomba',
+    },
+  },
+  { grupo: 'Otro', tipos: { otro: 'Otro' } },
+]
+
+export const TIPOS_EQUIPO: Mapa = Object.assign({}, ...GRUPOS_EQUIPO.map((g) => g.tipos))
 
 export const COMPONENTES: Mapa = {
   motor: 'Motor',

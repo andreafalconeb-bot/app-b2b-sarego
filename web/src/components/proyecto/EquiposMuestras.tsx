@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { supabase, ok } from '../../lib/supabase'
 import { ejecutar, leerConCache } from '../../lib/offline'
 import type { Equipo, Muestra, PuntoMuestreo } from '../../lib/tipos'
-import { COMPONENTES, NOMBRE_ESTADO_MUESTRA, TIPOS_EQUIPO, etiqueta } from '../../lib/catalogos'
+import { COMPONENTES, GRUPOS_EQUIPO, NOMBRE_ESTADO_MUESTRA, TIPOS_EQUIPO, etiqueta } from '../../lib/catalogos'
 import { codigoMuestra, fecha, hoyISO, numero } from '../../lib/formato'
 import { imprimirEtiquetas } from '../../lib/qr'
 import { AvisoCache, Campo, Cargando, ErrorMsg, Modal, Pill, PillSemaforo, Selector, Vacio, mensajeError, useCarga } from '../ui'
@@ -233,7 +233,17 @@ function EditarEquipo({ equipo, proyectoId, onCerrar, onHecho }: { equipo: Parti
   return (
     <Modal abierto={equipo !== null} titulo={f.id ? 'Editar equipo' : 'Nuevo equipo'} onCerrar={onCerrar} pie={<><button onClick={onCerrar}>Cancelar</button><button className="primario" onClick={() => void guardar()}>Guardar</button></>}>
       <div className="grid grid-2">
-        <Campo etiqueta="Tipo"><Selector valor={f.tipo} onCambio={(v) => set('tipo', v)} opciones={TIPOS_EQUIPO} /></Campo>
+        <Campo etiqueta="Tipo">
+          <select id="eq-tipo" value={f.tipo ?? 'otro'} onChange={(e) => set('tipo', e.target.value)}>
+            {GRUPOS_EQUIPO.map((g) => (
+              <optgroup key={g.grupo} label={g.grupo}>
+                {Object.entries(g.tipos).map(([k, v]) => (
+                  <option key={k} value={k}>{v}</option>
+                ))}
+              </optgroup>
+            ))}
+          </select>
+        </Campo>
         <Campo etiqueta="Código en el cliente"><input id="eq-cod" value={f.codigo_cliente ?? ''} onChange={(e) => set('codigo_cliente', e.target.value)} placeholder="Unidad 14" /></Campo>
         <Campo etiqueta="Marca"><input id="eq-marca" value={f.marca ?? ''} onChange={(e) => set('marca', e.target.value)} /></Campo>
         <Campo etiqueta="Modelo"><input id="eq-modelo" value={f.modelo ?? ''} onChange={(e) => set('modelo', e.target.value)} /></Campo>

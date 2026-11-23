@@ -11,7 +11,9 @@
   gerencia y después se asigna a un ingeniero, que es dueño de la cuenta;
   el traspaso exige motivo y nota; un ingeniero solo ve lo suyo y lo que
   le comparten; los descuentos los aprueba el gerente; los 5 criterios
-  del cliente ideal son informativos; estancado = 15 días; laboratorio
+  del cliente ideal son informativos (consumo: 20 o más camiones o 10
+  o más equipos de maquinaria pesada, Andrea 23/nov/2026; el curso decía
+  30 vehículos o equipos); estancado = 15 días; laboratorio
   Smart Assistance; un resultado crítico crea 3 compromisos (avisar en
   24 h, cambio de aceite, repetir la muestra); líneas: lubricantes,
   grasas y neumáticos; correo de la empresa en `mad4performance.com`.

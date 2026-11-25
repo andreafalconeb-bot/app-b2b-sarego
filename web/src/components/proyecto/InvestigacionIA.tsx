@@ -5,7 +5,7 @@ import { nombreDe, useSesion } from '../../lib/sesion'
 import type { Investigacion, ResultadoIA } from '../../lib/tipos'
 import { CRITERIOS, LINEAS, SEGMENTOS, etiqueta } from '../../lib/catalogos'
 import { fechaHora } from '../../lib/formato'
-import { COSTO_APROX, PRIORIDAD_IA, SENALES, fueGratis, gastoDelMes, investigar, usd } from '../../lib/ia'
+import { COSTO_APROX, PRIORIDAD_IA, PideClaude, SENALES, fueGratis, gastoDelMes, investigar, sinHallazgo, usd } from '../../lib/ia'
 import { Cargando, ErrorMsg, Pill, Vacio, mensajeError, useCarga } from '../ui'
 import type { PropsPestana } from '../../pages/Proyecto'
 
@@ -18,6 +18,8 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
   const [error, setError] = useState<string | null>(null)
   const [msg, setMsg] = useState<string | null>(null)
   const [copiado, setCopiado] = useState(false)
+  // Pregunta antes de investigar con Claude, que cuesta
+  const [pregunta, setPregunta] = useState<{ tipo: 'preliminar' | 'completa'; motivo: string } | null>(null)
 
   const { datos, error: errCarga, cargando, recargar } = useCarga(
     () =>
@@ -38,21 +40,22 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
   // Al tope solo se frena Claude; la vía gratis sigue (b2b-investigar)
   const sinPresupuesto = gasto >= tope
 
-  const ejecutar = async (tipo: 'preliminar' | 'completa') => {
+  const ejecutar = async (tipo: 'preliminar' | 'completa', conClaude = false) => {
     setTrabajando(tipo)
     setError(null)
     setMsg(null)
+    setPregunta(null)
     try {
-      const inv = await investigar(proyecto.id, tipo)
-      setMsg(
-        fueGratis(inv.modelo)
-          ? 'Listo. Se hizo gratis (Tavily + Gemini).'
-          : `Listo. La vía gratis no respondió y la hizo Claude: costó ${usd(inv.costo_usd)}.`,
-      )
+      const inv = await investigar(proyecto.id, tipo, conClaude)
+      setMsg(fueGratis(inv.modelo) ? 'Listo. Se hizo gratis (Tavily + Gemini).' : `Listo. La hizo Claude: costó ${usd(inv.costo_usd)}.`)
+      if (sinHallazgo(inv)) {
+        setPregunta({ tipo, motivo: 'La búsqueda gratis no encontró la empresa con certeza.' })
+      }
       await recargar()
       await recargarProyecto()
     } catch (e) {
-      setError(mensajeError(e))
+      if (e instanceof PideClaude) setPregunta({ tipo, motivo: 'La búsqueda gratis no pudo hacerse en este momento.' })
+      else setError(mensajeError(e))
       await recargar()
     } finally {
       setTrabajando(null)
@@ -135,13 +138,28 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
             </button>
             <span className="sec chico">
               La preliminar confirma qué es y si vale la pena. La completa busca además señales de compra, contactos y marcas.
-              Se hacen gratis con Tavily y Gemini; solo si esa vía no responde, la hace Claude (~{usd(COSTO_APROX.preliminar)} la preliminar, ~{usd(COSTO_APROX.completa)} la completa).
+              Se hacen gratis con Tavily y Gemini. Si no encuentran nada, te pregunta antes de buscar con Claude, que sí cuesta (~{usd(COSTO_APROX.preliminar)} la preliminar, ~{usd(COSTO_APROX.completa)} la completa).
             </span>
           </div>
         )}
-        {sinPresupuesto && <div className="aviso alerta chico">Se alcanzó el tope de gasto del mes: se sigue investigando gratis, pero sin el respaldo de Claude. El gerente puede subir el tope en Equipo → Ajustes.</div>}
+        {sinPresupuesto && <div className="aviso alerta chico">Se alcanzó el tope de gasto del mes: se sigue investigando gratis, pero ya no con Claude. El gerente puede subir el tope en Equipo → Ajustes.</div>}
         <ErrorMsg error={errCarga ?? error} />
         {msg && <div className="aviso ok">{msg}</div>}
+        {pregunta && puedeEditar && (
+          <div className="aviso alerta pila">
+            <div>
+              <b>{pregunta.motivo}</b> ¿Quieres buscar con Claude? Busca más a fondo, pero cuesta ~
+              {usd(COSTO_APROX[pregunta.tipo])}.
+            </div>
+            <div className="fila">
+              <button className="primario" disabled={!!trabajando || sinPresupuesto} onClick={() => void ejecutar(pregunta.tipo, true)}>
+                Sí, buscar con Claude (~{usd(COSTO_APROX[pregunta.tipo])})
+              </button>
+              <button onClick={() => setPregunta(null)}>No, dejarlo así</button>
+              {sinPresupuesto && <span className="sec chico">No se puede: se alcanzó el tope de gasto del mes.</span>}
+            </div>
+          </div>
+        )}
       </section>
 
       {cargando ? (

@@ -6,7 +6,7 @@ import { usePermisos, useSesion } from '../lib/sesion'
 import type { Proyecto } from '../lib/tipos'
 import { FUENTES, LINEAS, SEGMENTOS, SUCURSALES, etiqueta } from '../lib/catalogos'
 import { diasDesde, fecha } from '../lib/formato'
-import { COSTO_APROX, PRIORIDAD_IA, gastoDelMes, investigar, usd } from '../lib/ia'
+import { COSTO_APROX, PRIORIDAD_IA, PideClaude, gastoDelMes, investigar, sinHallazgo, usd } from '../lib/ia'
 import { ordenZona, zonaDe } from '../lib/zonas'
 import { AvisoCache, Cargando, Campo, ErrorMsg, Modal, Pill, Selector, Vacio, mensajeError, useCarga } from '../components/ui'
 
@@ -447,7 +447,8 @@ function PillIA({ p }: { p: string }) {
 function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; onCerrar: () => void; candidatos: Proyecto[] }) {
   const [cantidad, setCantidad] = useState(5)
   const [estado, setEstado] = useState<'listo' | 'corriendo' | 'terminado'>('listo')
-  const [hechas, setHechas] = useState<{ nombre: string; costo: number; prioridad: string | null; error: string | null }[]>([])
+  // pideClaude: no salió gratis (o no encontró nada); se puede repetir con Claude si se acepta
+  const [hechas, setHechas] = useState<{ id: string; nombre: string; costo: number; prioridad: string | null; error: string | null; pideClaude: boolean }[]>([])
   const [presupuesto, setPresupuesto] = useState<{ gasto: number; tope: number } | null>(null)
   const parar = useRef(false)
 
@@ -467,22 +468,31 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
   const n = Math.min(cantidad, candidatos.length)
   const total = hechas.reduce((a, h) => a + h.costo, 0)
 
-  const correr = async () => {
+  const correr = async (lista: Proyecto[], conClaude = false) => {
     parar.current = false
     setEstado('corriendo')
-    for (const x of candidatos.slice(0, n)) {
+    // Al repetir con Claude, las filas pendientes se reemplazan
+    if (conClaude) setHechas((h) => h.filter((x) => !x.pideClaude))
+    for (const x of lista) {
       if (parar.current) break
+      const nombre = x.nombre_comercial || x.razon_social
       try {
-        const inv = await investigar(x.id, 'preliminar')
-        setHechas((h) => [...h, { nombre: x.nombre_comercial || x.razon_social, costo: Number(inv.costo_usd), prioridad: inv.resultado?.prioridad ?? null, error: null }])
+        const inv = await investigar(x.id, 'preliminar', conClaude)
+        const flojo = sinHallazgo(inv)
+        setHechas((h) => [...h, {
+          id: x.id, nombre, costo: Number(inv.costo_usd), prioridad: inv.resultado?.prioridad ?? null,
+          error: flojo ? 'Gratis no la encontró con certeza' : null, pideClaude: flojo,
+        }])
       } catch (e) {
-        const m = mensajeError(e)
-        setHechas((h) => [...h, { nombre: x.nombre_comercial || x.razon_social, costo: 0, prioridad: null, error: m }])
-        if (/tope de gasto|ANTHROPIC_API_KEY|no es válida|señal/i.test(m)) break
+        const pide = e instanceof PideClaude
+        const m = pide ? 'No salió gratis' : mensajeError(e)
+        setHechas((h) => [...h, { id: x.id, nombre, costo: 0, prioridad: null, error: m, pideClaude: pide }])
+        if (!pide && /tope de gasto|ANTHROPIC_API_KEY|no es válida|señal/i.test(m)) break
       }
     }
     setEstado('terminado')
   }
+  const pendientesClaude = hechas.filter((h) => h.pideClaude)
 
   return (
     <Modal
@@ -499,8 +509,16 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
           <>
             <button onClick={onCerrar}>Cerrar</button>
             {estado === 'listo' && (
-              <button className="primario" disabled={!n} onClick={() => void correr()}>
+              <button className="primario" disabled={!n} onClick={() => void correr(candidatos.slice(0, n))}>
                 Investigar {n} (gratis)
+              </button>
+            )}
+            {estado === 'terminado' && pendientesClaude.length > 0 && (
+              <button
+                disabled={!!presupuesto && presupuesto.gasto >= presupuesto.tope}
+                onClick={() => void correr(candidatos.filter((c) => pendientesClaude.some((h) => h.id === c.id)), true)}
+              >
+                Buscar {pendientesClaude.length} con Claude (~{usd(pendientesClaude.length * COSTO_APROX.preliminar)})
               </button>
             )}
           </>
@@ -508,7 +526,7 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
       }
     >
       <p className="chico" style={{ margin: 0 }}>
-        Para cada semilla sin investigar de la lista filtrada, hace 2 búsquedas en la web y dice si la empresa existe, a qué se dedica, si tiene flota o planta, sus redes y una prioridad. Después puedes hacer la investigación completa solo de las que valen la pena. Se hace gratis con Tavily y Gemini; si esa vía no responde, la hace Claude (~{usd(COSTO_APROX.preliminar)} cada una).
+        Para cada semilla sin investigar de la lista filtrada, hace 2 búsquedas en la web y dice si la empresa existe, a qué se dedica, si tiene flota o planta, sus redes y una prioridad. Después puedes hacer la investigación completa solo de las que valen la pena. Se hace gratis con Tavily y Gemini. Las que no salgan gratis quedan marcadas y, al terminar, puedes decidir si las buscas con Claude (~{usd(COSTO_APROX.preliminar)} cada una).
       </p>
       <div className="fila">
         <span>Hay <b>{candidatos.length}</b> semillas sin investigar.</span>
@@ -529,7 +547,10 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
               {hechas.map((h, i) => (
                 <tr key={i}>
                   <td>{h.nombre}</td>
-                  <td>{h.error ? <span className="chico" style={{ color: 'var(--critico)' }}>{h.error}</span> : h.prioridad ? <PillIA p={h.prioridad} /> : '—'}</td>
+                  <td>
+                    {h.prioridad && <PillIA p={h.prioridad} />}{' '}
+                    {h.error ? <span className="chico" style={{ color: h.pideClaude ? 'var(--alerta)' : 'var(--critico)' }}>{h.error}</span> : !h.prioridad && '—'}
+                  </td>
                   <td className="num">{usd(h.costo)}</td>
                 </tr>
               ))}
@@ -539,8 +560,8 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
       )}
       {estado !== 'listo' && (
         <div className="aviso">
-          {estado === 'corriendo' ? `Investigando ${hechas.length + 1} de ${n}…` : `Terminado: ${hechas.filter((h) => !h.error).length} investigadas.`} Costo real: <b>{usd(total)}</b>
-          {hechas.length > 0 && ` · promedio ${usd(total / Math.max(1, hechas.filter((h) => !h.error).length))} por empresa`}
+          {estado === 'corriendo' ? `Investigando ${hechas.length + 1} de ${n}…` : `Terminado: ${hechas.filter((h) => h.prioridad).length} investigadas${pendientesClaude.length ? `, ${pendientesClaude.length} sin resultado gratis` : ""}.`} Costo real: <b>{usd(total)}</b>
+          {hechas.length > 0 && ` · promedio ${usd(total / Math.max(1, hechas.filter((h) => h.prioridad).length))} por empresa`}
         </div>
       )}
     </Modal>

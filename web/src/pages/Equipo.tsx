@@ -303,7 +303,7 @@ function Ajustes() {
       <Campo etiqueta="Tope de gasto mensual de la investigación con IA (US$)">
         <input type="number" min={0} step={1} defaultValue={datos.ia_presupuesto_mensual_usd} onBlur={(e) => void guardar({ ia_presupuesto_mensual_usd: Number(e.target.value) })} />
       </Campo>
-      <p className="sec chico" style={{ margin: 0 }}>Al llegar al tope, nadie puede investigar hasta el mes siguiente. Una preliminar cuesta ~US$ 0,02 y una completa ~US$ 0,06.</p>
+      <p className="sec chico" style={{ margin: 0 }}>Las investigaciones se hacen gratis con Tavily y Gemini. El tope solo cuenta lo que hace Claude cuando la vía gratis no responde (~US$ 0,02 la preliminar, ~US$ 0,06 la completa); al llegar a él, se sigue investigando gratis pero sin ese respaldo.</p>
       <ErrorMsg error={err} />
     </section>
   )

@@ -500,7 +500,7 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
             <button onClick={onCerrar}>Cerrar</button>
             {estado === 'listo' && (
               <button className="primario" disabled={!n} onClick={() => void correr()}>
-                Investigar {n} (~{usd(n * COSTO_APROX.preliminar)})
+                Investigar {n} (gratis)
               </button>
             )}
           </>
@@ -508,7 +508,7 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
       }
     >
       <p className="chico" style={{ margin: 0 }}>
-        Para cada semilla sin investigar de la lista filtrada, hace 2 búsquedas en la web y dice si la empresa existe, a qué se dedica, si tiene flota o planta, sus redes y una prioridad. Después puedes hacer la investigación completa solo de las que valen la pena.
+        Para cada semilla sin investigar de la lista filtrada, hace 2 búsquedas en la web y dice si la empresa existe, a qué se dedica, si tiene flota o planta, sus redes y una prioridad. Después puedes hacer la investigación completa solo de las que valen la pena. Se hace gratis con Tavily y Gemini; si esa vía no responde, la hace Claude (~{usd(COSTO_APROX.preliminar)} cada una).
       </p>
       <div className="fila">
         <span>Hay <b>{candidatos.length}</b> semillas sin investigar.</span>
@@ -517,7 +517,7 @@ function InvestigarLote({ abierto, onCerrar, candidatos }: { abierto: boolean; o
         )}
       </div>
       {estado === 'listo' && candidatos.length > 0 && (
-        <Campo etiqueta="Cuántas investigar ahora (empieza con pocas para ver el costo real)">
+        <Campo etiqueta="Cuántas investigar ahora (empieza con pocas para revisar los resultados)">
           <input type="number" min={1} max={candidatos.length} value={cantidad} onChange={(e) => setCantidad(Math.max(1, Number(e.target.value) || 1))} style={{ maxWidth: 120 }} />
         </Campo>
       )}

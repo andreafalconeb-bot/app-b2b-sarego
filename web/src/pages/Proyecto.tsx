@@ -17,6 +17,7 @@ import Cotizaciones from '../components/proyecto/Cotizaciones'
 import Pilotos from '../components/proyecto/Pilotos'
 import EquipoTrabajo from '../components/proyecto/EquipoTrabajo'
 import InvestigacionIA from '../components/proyecto/InvestigacionIA'
+import ClientePestana, { ActivarCliente } from '../components/proyecto/Cliente'
 
 export interface Miembro {
   user_id: string
@@ -31,6 +32,7 @@ export interface PropsPestana {
 
 const PESTANAS = [
   ['resumen', 'Resumen'],
+  ['cliente', 'Cliente'],
   ['ia', 'Investigación IA'],
   ['linea', 'Línea de tiempo'],
   ['decisores', 'Decisores'],
@@ -49,6 +51,7 @@ export default function ProyectoPagina() {
   const [params, setParams] = useSearchParams()
   const pestana = params.get('p') ?? 'resumen'
   const [copiado, setCopiado] = useState(false)
+  const [activar, setActivar] = useState(false)
 
   const { datos, error, cargando, recargar } = useCarga(
     () =>
@@ -104,6 +107,7 @@ export default function ProyectoPagina() {
             <div className="fila">
               <span className="mono sec">{proyecto.codigo}</span>
               <Pill tono={proyecto.etapa_fase === 'oficina' ? 'ambar' : proyecto.etapa === 'perdido' ? 'critico' : 'acento'}>{proyecto.etapa_nombre}</Pill>
+              {proyecto.cliente_activo_at && <Pill tono="ok">Cliente activo · {proyecto.codigo_erp}</Pill>}
               {proyecto.estancado && <Pill tono="alerta">Estancado</Pill>}
               {proyecto.muestras_criticas_abiertas > 0 && <Pill tono="critico">{proyecto.muestras_criticas_abiertas} muestra(s) crítica(s)</Pill>}
               {!puedeEditar && <Pill>Solo lectura</Pill>}
@@ -119,6 +123,9 @@ export default function ProyectoPagina() {
             <span className="chico">
               Responsable: <b>{proyecto.responsable_nombre ?? 'Oficina de prospectación'}</b>
             </span>
+            {!proyecto.cliente_activo_at && puedeEditar && (
+              <button className="chico" onClick={() => setActivar(true)}>Activar como cliente</button>
+            )}
             <span className="chico sec" title="Pon esta dirección en copia (CC) y el correo queda en el expediente">
               Correo del expediente: <span className="mono">{correo}</span>{' '}
               <button className="chico" onClick={() => void copiarCorreo()}>{copiado ? 'Copiado' : 'Copiar'}</button>
@@ -141,6 +148,7 @@ export default function ProyectoPagina() {
       </div>
 
       {pestana === 'resumen' && <Resumen {...props} />}
+      {pestana === 'cliente' && <ClientePestana {...props} />}
       {pestana === 'ia' && <InvestigacionIA {...props} />}
       {pestana === 'linea' && <LineaTiempo {...props} />}
       {pestana === 'decisores' && <Decisores {...props} />}
@@ -150,6 +158,16 @@ export default function ProyectoPagina() {
       {pestana === 'cotizaciones' && <Cotizaciones {...props} />}
       {pestana === 'pilotos' && <Pilotos {...props} />}
       {pestana === 'equipo' && <EquipoTrabajo {...props} miembros={miembros} />}
+      <ActivarCliente
+        proyecto={proyecto}
+        abierto={activar}
+        onCerrar={() => setActivar(false)}
+        onListo={() => {
+          setActivar(false)
+          setParams({ p: 'cliente' }, { replace: true })
+          void recargar()
+        }}
+      />
     </>
   )
 }

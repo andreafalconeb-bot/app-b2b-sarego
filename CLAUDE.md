@@ -20,6 +20,13 @@
 - Sucursales B2B: `01` Caracas, `02` Valencia y `03` Ciudad Bolívar (Andrea,
   23/nov/2026; `03` lo asignó la app, el ERP no tiene código para Ciudad
   Bolívar). Las Semillas deducen la sucursal del punto (`sucursalPorPunto`).
+- Clientes activos (Andrea, 25/nov/2026): se activan desde cualquier
+  etapa con el código del ERP (`Cliente.tsx`, `b2b_activar_cliente`,
+  migración 0141). Agenda automática: contacto cada 30 días y revisión
+  cada 90, configurable por cliente. Se crea siempre su empresa en Flota
+  SAREGO, la use o no. Conviven con el vendedor retail: aquí se leen sus
+  compras, cartera y cobros del ERP en solo lectura. Sin visitas de ruta:
+  son ventas por proyecto. Lista en `/clientes`.
 - Todo texto de la interfaz en español de Venezuela, tuteando.
 - **Publicación:** Andrea (23/nov/2026) autorizó que Claude publique solo
   los cambios de esta app: abrir el PR, unirlo a `main` cuando `tsc`, las

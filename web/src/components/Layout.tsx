@@ -59,6 +59,7 @@ export default function Layout() {
         <nav>
           <NavLink to="/" end>Inicio</NavLink>
           <NavLink to="/prospectos">Prospectos</NavLink>
+          <NavLink to="/clientes">Clientes</NavLink>
           {p.gestion && <NavLink to="/semillas">Semillas</NavLink>}
           <NavLink to="/muestras">Muestras</NavLink>
           <NavLink to="/kits">Kits</NavLink>

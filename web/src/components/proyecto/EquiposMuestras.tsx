@@ -8,6 +8,7 @@ import { codigoMuestra, fecha, hoyISO, numero } from '../../lib/formato'
 import { imprimirEtiquetas } from '../../lib/qr'
 import { AvisoCache, Campo, Cargando, ErrorMsg, Modal, Pill, PillSemaforo, Selector, Vacio, mensajeError, useCarga } from '../ui'
 import type { PropsPestana } from '../../pages/Proyecto'
+import ExportarFlota from './ExportarFlota'
 
 export default function EquiposMuestras({ proyecto, puedeEditar }: PropsPestana) {
   const [equipoEdit, setEquipoEdit] = useState<Partial<Equipo> | null>(null)
@@ -66,8 +67,13 @@ export default function EquiposMuestras({ proyecto, puedeEditar }: PropsPestana)
 
   const ultimaDe = (puntoId: string) => muestras.find((m) => m.punto_id === puntoId)
 
+  const conResultado = muestras.filter(
+    (m) => ['resultado_cargado', 'interpretada', 'comunicada', 'cerrada'].includes(m.estado) || m.semaforo_final || m.semaforo_lab,
+  ).length
+
   return (
     <div className="pila">
+      <ExportarFlota proyecto={proyecto} puedeEditar={puedeEditar} equipos={equipos.filter((e) => e.activo).length} analisis={conResultado} />
       <div className="fila-entre">
         <div className="sec chico">
           {equipos.length} equipos · {puntos.length} puntos de muestreo · {muestras.length} muestras

@@ -4,6 +4,7 @@ import { configFaltante } from './lib/supabase'
 import Layout from './components/Layout'
 import Login from './pages/Login'
 import Inicio from './pages/Inicio'
+import Clientes from './pages/Clientes'
 import Prospectos from './pages/Prospectos'
 import Semillas from './pages/Semillas'
 import ProyectoPagina from './pages/Proyecto'
@@ -44,6 +45,7 @@ export default function App() {
       <Route element={<Layout />}>
         <Route path="/" element={<Inicio />} />
         <Route path="/prospectos" element={<Prospectos />} />
+        <Route path="/clientes" element={<Clientes />} />
         <Route path="/semillas" element={<Semillas />} />
         <Route path="/proyecto/:id" element={<ProyectoPagina />} />
         <Route path="/muestras" element={<Muestras />} />

@@ -68,6 +68,14 @@ export interface Proyecto {
   proxima_gestion: string | null
   created_at: string
   cliente_erp_id: string | null
+  // Cliente activo (migración 0141): se activa con el código del ERP
+  codigo_erp: string | null
+  cliente_activo_at: string | null
+  activado_por: string | null
+  dias_contacto: number
+  dias_revision: number
+  proximo_contacto: string | null
+  proxima_revision: string | null
   // Composición de la flota: {tipo de equipo: cantidad} (migración 0124)
   flota: Record<string, number>
   semilla: Semilla | null
@@ -120,6 +128,7 @@ export interface Compromiso {
   cumplido_at: string | null
   muestra_id: string | null
   automatico: boolean
+  agenda: 'contacto' | 'revision' | null
   recordar_whatsapp: boolean
   recordar_calendar: boolean
 }

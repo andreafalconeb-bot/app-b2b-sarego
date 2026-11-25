@@ -211,3 +211,8 @@ dialog.modal::backdrop { background: rgb(10 20 26 / .45); }
   .ocultar-movil { display: none; }
 }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; } }
+
+/* Pares etiqueta-valor (ficha del ERP, agenda del cliente) */
+.datos { display: grid; grid-template-columns: max-content 1fr; gap: 4px 12px; margin: 0 0 8px; }
+.datos dt { color: var(--texto-2); font-size: .85rem; }
+.datos dd { margin: 0; }

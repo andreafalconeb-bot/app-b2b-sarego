@@ -3,7 +3,13 @@ import type { Investigacion } from './tipos'
 
 // Costos aproximados por empresa con Claude Haiku 5.5 (ver la Edge
 // Function b2b-investigar). El costo real de cada una queda guardado.
+// Costo si la hace Claude (respaldo). Por la vía gratis (Tavily + Gemini) cuesta 0.
 export const COSTO_APROX = { preliminar: 0.02, completa: 0.06 } as const
+
+/** Se hizo gratis con Tavily + Gemini (b2b-investigar, gratis.ts) */
+export function fueGratis(modelo: string | null | undefined): boolean {
+  return /gemini/i.test(modelo ?? '')
+}
 
 export const PRIORIDAD_IA: Record<string, string> = {
   alta: 'Prioridad alta',

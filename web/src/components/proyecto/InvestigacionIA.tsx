@@ -5,7 +5,7 @@ import { nombreDe, useSesion } from '../../lib/sesion'
 import type { Investigacion, ResultadoIA } from '../../lib/tipos'
 import { CRITERIOS, LINEAS, SEGMENTOS, etiqueta } from '../../lib/catalogos'
 import { fechaHora } from '../../lib/formato'
-import { COSTO_APROX, PRIORIDAD_IA, SENALES, gastoDelMes, investigar, usd } from '../../lib/ia'
+import { COSTO_APROX, PRIORIDAD_IA, SENALES, fueGratis, gastoDelMes, investigar, usd } from '../../lib/ia'
 import { Cargando, ErrorMsg, Pill, Vacio, mensajeError, useCarga } from '../ui'
 import type { PropsPestana } from '../../pages/Proyecto'
 
@@ -35,6 +35,7 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
   const r = ultima?.resultado ?? null
   const gasto = datos?.datos.gasto ?? 0
   const tope = datos?.datos.tope ?? 10
+  // Al tope solo se frena Claude; la vía gratis sigue (b2b-investigar)
   const sinPresupuesto = gasto >= tope
 
   const ejecutar = async (tipo: 'preliminar' | 'completa') => {
@@ -43,7 +44,11 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
     setMsg(null)
     try {
       const inv = await investigar(proyecto.id, tipo)
-      setMsg(`Listo. Esta investigación costó ${usd(inv.costo_usd)} (${inv.busquedas} búsqueda${inv.busquedas === 1 ? '' : 's'}).`)
+      setMsg(
+        fueGratis(inv.modelo)
+          ? 'Listo. Se hizo gratis (Tavily + Gemini).'
+          : `Listo. La vía gratis no respondió y la hizo Claude: costó ${usd(inv.costo_usd)}.`,
+      )
       await recargar()
       await recargarProyecto()
     } catch (e) {
@@ -122,16 +127,19 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
         </div>
         {puedeEditar && (
           <div className="fila">
-            <button className="primario" disabled={!!trabajando || sinPresupuesto} onClick={() => void ejecutar('preliminar')}>
-              {trabajando === 'preliminar' ? 'Investigando…' : `Preliminar (~${usd(COSTO_APROX.preliminar)})`}
+            <button className="primario" disabled={!!trabajando} onClick={() => void ejecutar('preliminar')}>
+              {trabajando === 'preliminar' ? 'Investigando…' : 'Preliminar (gratis)'}
             </button>
-            <button disabled={!!trabajando || sinPresupuesto} onClick={() => void ejecutar('completa')}>
-              {trabajando === 'completa' ? 'Investigando… (hasta 1 min)' : `Completa (~${usd(COSTO_APROX.completa)})`}
+            <button disabled={!!trabajando} onClick={() => void ejecutar('completa')}>
+              {trabajando === 'completa' ? 'Investigando… (hasta 1 min)' : 'Completa (gratis)'}
             </button>
-            <span className="sec chico">La preliminar confirma qué es y si vale la pena. La completa busca además señales de compra, contactos y marcas.</span>
+            <span className="sec chico">
+              La preliminar confirma qué es y si vale la pena. La completa busca además señales de compra, contactos y marcas.
+              Se hacen gratis con Tavily y Gemini; solo si esa vía no responde, la hace Claude (~{usd(COSTO_APROX.preliminar)} la preliminar, ~{usd(COSTO_APROX.completa)} la completa).
+            </span>
           </div>
         )}
-        {sinPresupuesto && <div className="aviso alerta chico">Se alcanzó el tope de gasto del mes. El gerente lo puede subir en Equipo → Ajustes.</div>}
+        {sinPresupuesto && <div className="aviso alerta chico">Se alcanzó el tope de gasto del mes: se sigue investigando gratis, pero sin el respaldo de Claude. El gerente puede subir el tope en Equipo → Ajustes.</div>}
         <ErrorMsg error={errCarga ?? error} />
         {msg && <div className="aviso ok">{msg}</div>}
       </section>
@@ -243,13 +251,14 @@ export default function InvestigacionIA({ proyecto, puedeEditar, recargarProyect
         <section className="tarjeta tabla-wrap">
           <h3 style={{ marginBottom: 6 }}>Historial y costos</h3>
           <table>
-            <thead><tr><th>Fecha</th><th>Tipo</th><th>Pedida por</th><th>Búsquedas</th><th>Costo</th><th>Estado</th></tr></thead>
+            <thead><tr><th>Fecha</th><th>Tipo</th><th>Pedida por</th><th>Hecha con</th><th>Búsquedas</th><th>Costo</th><th>Estado</th></tr></thead>
             <tbody>
               {lista.map((i) => (
                 <tr key={i.id}>
                   <td className="chico">{fechaHora(i.created_at)}</td>
                   <td className="chico">{i.tipo === 'completa' ? 'Completa' : 'Preliminar'}</td>
                   <td className="chico">{nombreDe(usuarios, i.solicitado_por)}</td>
+                  <td className="chico">{fueGratis(i.modelo) ? <span className="pill ok">Gratis</span> : 'Claude'}</td>
                   <td className="num">{i.busquedas}</td>
                   <td className="num">{usd(Number(i.costo_usd))}</td>
                   <td className="chico">{i.estado === 'ok' ? 'Bien' : <span title={i.error ?? ''}>Error: {i.error}</span>}</td>

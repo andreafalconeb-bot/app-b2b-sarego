@@ -29,13 +29,24 @@ export const SENALES: Record<string, string> = {
   otra: 'Otra señal',
 }
 
-/** Llama a la Edge Function; devuelve la investigación o lanza un error legible. */
-export async function investigar(proyectoId: string, tipo: 'preliminar' | 'completa'): Promise<Investigacion> {
+/** La vía gratis no pudo; la función pregunta antes de usar Claude, que
+ * cuesta (Andrea: "ANTES DE PASAR A CLAUDE PAGO QUE PREGUNTE"). */
+export class PideClaude extends Error {}
+
+/** Lo gratis salió, pero no encontró la empresa con certeza */
+export function sinHallazgo(inv: Investigacion): boolean {
+  return fueGratis(inv.modelo) && !!inv.resultado && inv.resultado.existe !== 'si'
+}
+
+/** Llama a la Edge Function; devuelve la investigación o lanza un error legible.
+ * Primero gratis; con conClaude: true investiga con Claude (cuesta). */
+export async function investigar(proyectoId: string, tipo: 'preliminar' | 'completa', conClaude = false): Promise<Investigacion> {
   if (!navigator.onLine) throw new Error('La investigación con IA necesita señal.')
-  const { data, error } = await supabase.functions.invoke('b2b-investigar', { body: { proyecto_id: proyectoId, tipo } })
+  const { data, error } = await supabase.functions.invoke('b2b-investigar', { body: { proyecto_id: proyectoId, tipo, con_claude: conClaude } })
   if (error) {
     const ctx = (error as { context?: Response }).context
     const cuerpo = ctx ? await ctx.json().catch(() => null) : null
+    if (cuerpo?.pide_claude) throw new PideClaude(cuerpo.error ?? 'No se pudo investigar gratis.')
     throw new Error(cuerpo?.error ?? error.message)
   }
   return (data as { investigacion: Investigacion }).investigacion
